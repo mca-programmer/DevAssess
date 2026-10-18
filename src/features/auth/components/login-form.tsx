@@ -1,0 +1,366 @@
+/** biome-ignore-all lint/a11y/noSvgWithoutTitle: <explanation> */
+"use client";
+
+import { useEffect, useState } from "react";
+import { useForm } from "@tanstack/react-form";
+import {
+  Eye,
+  EyeOff,
+  LockKeyhole,
+  Mail,
+  UserRound,
+  UsersRound,
+} from "lucide-react";
+
+import {
+  Field,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+  FieldSeparator,
+} from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { loginSchema } from "../auth.schema";
+import { useGetMe, useLogin } from "../hooks";
+import { toast } from "sonner";
+import { Spinner } from "@/components/ui/spinner";
+import { useRouter, useSearchParams } from "next/navigation";
+import { FetchError } from "ofetch";
+import GoogleLoginButton from "./google-login";
+import { useQueryClient } from "@tanstack/react-query";
+import { getMe } from "../auth.api";
+import { UserRoleType } from "../auth.types";
+
+const demoAccounts = {
+  candidate: {
+    label: "Candidate",
+    email: "mdalaminn457@gmail.com",
+    password: "Candidate@123",
+  },
+  recruiter: {
+    label: "Recruiter",
+    email: "sumaiya84857@gmail.com",
+    password: "Candidate@123",
+  },
+  admin: {
+    label: "Admin",
+    email: "testeradmin@gmail.com",
+    password: "Tester@admin12345",
+  },
+};
+
+const LoginForm = () => {
+  const [showPassword, setShowPassword] = useState(false);
+  const router = useRouter();
+  const { mutate: login, isPending: loginPending } = useLogin();
+  const searchParams = useSearchParams();
+  const queryClient = useQueryClient();
+
+  const form = useForm({
+    defaultValues: {
+      email: "",
+      password: "",
+    },
+
+    validators: {
+      onSubmit: loginSchema,
+    },
+
+    onSubmit: ({ value }) => {
+      const loginData = {
+        email: value.email,
+        password: value.password,
+      };
+
+      login(loginData, {
+        onSuccess: async (res) => {
+  if (!res.success) {
+    toast.error(
+      res.message || "Authentication failed. Please try again.",
+    );
+    return;
+  }
+
+  try {
+    const meResponse = await queryClient.fetchQuery({
+      queryKey: ["user"],
+      queryFn: getMe,
+      staleTime: 0,
+      retry: false,
+    });
+
+    if (!meResponse?.success || !meResponse.data) {
+      toast.error("Unable to load your account information.");
+      return;
+    }
+
+    // Cache the authenticated user for other components.
+    queryClient.setQueryData(["user"], meResponse);
+
+    toast.success(res.message || "Logged in successfully!");
+
+    const dashboardPaths = {
+      CANDIDATE: "/candidate",
+      RECRUITER: "/recruiter",
+      ADMIN: "/admin",
+    } as const;
+    const role = meResponse.data.role as UserRoleType;
+
+    router.replace(dashboardPaths[role]);
+  } catch {
+    toast.error(
+      "Login succeeded, but your account information could not be loaded.",
+    );
+  }
+},
+
+        onError: (error: FetchError) => {
+          console.log(error);
+
+          const errorMessage =
+            error?.data?.message || error?.message || "Authorization failure";
+
+          toast.error(errorMessage);
+        },
+      });
+    },
+  });
+
+  const handleDemoLogin = (
+    account: (typeof demoAccounts)[keyof typeof demoAccounts],
+  ) => {
+    form.setFieldValue("email", account.email);
+    form.setFieldValue("password", account.password);
+  };
+
+  useEffect(() => {
+    const error = searchParams.get("error");
+
+    if (error === "google-login-failed") {
+      toast.error("Google login is only available for Candidates.", {
+        description: "Please login with email and password.",
+        id: "google-login-error",
+      });
+
+      window.history.replaceState(null, "", "/login");
+    }
+  }, [searchParams]);
+
+  return (
+    <div className="w-full max-w-md">
+      {/* Heading */}
+      <div className="mb-7 text-center">
+        <div className="mb-3 inline-flex size-20 items-center justify-center rounded-xl bg-primary/10 text-primary">
+          <UserRound className="size-10" />
+        </div>
+
+        <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+          Welcome back
+        </h1>
+
+        <p className="mt-2 text-sm leading-6 text-muted-foreground">
+          Sign in to continue to your assessment workspace.
+        </p>
+      </div>
+
+      {/* 1-Click Demo Login */}
+      <div className="mb-6 rounded-2xl border border-border/60 bg-muted/30 p-2 sm:p-3">
+        <div className="mb-2.5 text-center">
+          <p className="text-xs font-semibold text-foreground">1-Click Login</p>
+          <p className="mt-0.5 text-[11px] text-muted-foreground">
+            Choose a demo account to autofill credentials
+          </p>
+        </div>
+
+        <div className="flex items-center flex-wrap justify-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => handleDemoLogin(demoAccounts.candidate)}
+            className="h-8 rounded-xl text-xs"
+          >
+            <UserRound className="size-3.5" />
+            Candidate
+          </Button>
+
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => handleDemoLogin(demoAccounts.recruiter)}
+            className="h-8 rounded-xl text-xs"
+          >
+            <UsersRound className="size-3.5" />
+            Recruiter
+          </Button>
+
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => handleDemoLogin(demoAccounts.admin)}
+            className="h-8 rounded-xl text-xs"
+          >
+            <UserRound className="size-3.5" />
+            Admin
+          </Button>
+        </div>
+      </div>
+
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          form.handleSubmit();
+        }}
+      >
+        <FieldGroup className="gap-5">
+          {/* Email */}
+          <form.Field name="email">
+            {(field) => {
+              const isInvalid =
+                field.state.meta.isTouched && !field.state.meta.isValid;
+
+              return (
+                <Field data-invalid={isInvalid}>
+                  <FieldLabel htmlFor={field.name}>Email address</FieldLabel>
+
+                  <div className="group relative">
+                    <Mail className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground transition-colors group-focus-within:text-primary" />
+
+                    <Input
+                      id={field.name}
+                      name={field.name}
+                      type="email"
+                      placeholder="you@example.com"
+                      autoComplete="email"
+                      value={field.state.value}
+                      onChange={(e) => field.handleChange(e.target.value)}
+                      onBlur={field.handleBlur}
+                      aria-invalid={isInvalid}
+                      className="h-11 pl-10.5"
+                    />
+                  </div>
+
+                  <div className="min-h-5">
+                    {isInvalid ? (
+                      <FieldError errors={field.state.meta.errors} />
+                    ) : (
+                      <span className="text-sm text-muted-foreground">
+                        Enter your valid email address.
+                      </span>
+                    )}
+                  </div>
+                </Field>
+              );
+            }}
+          </form.Field>
+
+          {/* Password */}
+          <form.Field name="password">
+            {(field) => {
+              const isInvalid =
+                field.state.meta.isTouched && !field.state.meta.isValid;
+
+              return (
+                <Field data-invalid={isInvalid}>
+                  <div className="flex items-center justify-between gap-3">
+                    <FieldLabel htmlFor={field.name}>Password</FieldLabel>
+
+                    <a
+                      href="/forgot-password"
+                      className="text-xs font-medium text-primary underline-offset-4 hover:underline"
+                    >
+                      Forgot password?
+                    </a>
+                  </div>
+
+                  <div className="group relative">
+                    <LockKeyhole className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground transition-colors group-focus-within:text-primary" />
+
+                    <Input
+                      id={field.name}
+                      name={field.name}
+                      type={showPassword ? "text" : "password"}
+                      placeholder="Enter your password"
+                      autoComplete="current-password"
+                      value={field.state.value}
+                      onChange={(e) => field.handleChange(e.target.value)}
+                      onBlur={field.handleBlur}
+                      aria-invalid={isInvalid}
+                      className="h-11 pl-10.5 pr-11"
+                    />
+
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((current) => !current)}
+                      aria-label={
+                        showPassword ? "Hide password" : "Show password"
+                      }
+                      className="absolute right-0 top-0 flex h-11 w-11 items-center justify-center text-muted-foreground transition-colors hover:text-foreground"
+                    >
+                      {showPassword ? (
+                        <EyeOff className="size-4" />
+                      ) : (
+                        <Eye className="size-4" />
+                      )}
+                    </button>
+                  </div>
+
+                  <div className="min-h-5">
+                    {isInvalid ? (
+                      <FieldError errors={field.state.meta.errors} />
+                    ) : (
+                      <span className="text-sm text-muted-foreground">
+                        Please provide your valid password.
+                      </span>
+                    )}
+                  </div>
+                </Field>
+              );
+            }}
+          </form.Field>
+
+          {/* Submit */}
+          <Field className="pt-1">
+            <Button
+              type="submit"
+              size="lg"
+              disabled={loginPending}
+              className="h-11 w-full shadow-lg shadow-primary/15 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl"
+            >
+              {loginPending ? (
+                <>
+                  <Spinner /> Signing...
+                </>
+              ) : (
+                "Sign In"
+              )}
+            </Button>
+          </Field>
+
+          {/* Google — Candidate only */}
+          <FieldSeparator>Or continue with</FieldSeparator>
+
+          <Field>
+            <GoogleLoginButton />
+          </Field>
+        </FieldGroup>
+      </form>
+
+      {/* Register */}
+      <p className="mt-6 text-center text-sm text-muted-foreground">
+        Don&apos;t have an account?{" "}
+        <a
+          href="/register"
+          className="font-semibold text-primary underline-offset-4 hover:underline"
+        >
+          Create account
+        </a>
+      </p>
+    </div>
+  );
+};
+
+export default LoginForm;
