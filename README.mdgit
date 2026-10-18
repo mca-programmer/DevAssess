@@ -1,0 +1,2 @@
+"# DevAssess"  initgit add .git commit -m "first commit"git branch -M maingit remote add origin https://github.com/mca-programmer/DevAssess.gitgit push -u origin main
+"# DevAssess"  initgit add . git commit -m "first commit"git branch -M maingit remote add origin https://github.com/mca-programmer/DevAssess.gitgit push -u origin main
