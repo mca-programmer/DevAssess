@@ -62,7 +62,7 @@ Open [http://localhost:3000](http://localhost:3000).
 
 ### 👨‍💻 Author
 
-**Al-amin** · [@mca-programmer](https://github.com/mca-programmer)
+**MD MUSARRAF HOSEN** · [@mca-programmer](https://github.com/mca-programmer)
 
 ---
 
